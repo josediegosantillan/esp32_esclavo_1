@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <string.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -21,6 +22,11 @@ static const uint8_t ESPNOW_CHANNEL = 11;
 /* GPIO del rele; ajustar segun el cableado */
 static const gpio_num_t RELAY_GPIO = GPIO_NUM_4;
 static bool relay_state = false;
+
+static bool is_authorized_peer(const uint8_t *mac)
+{
+    return mac && memcmp(mac, EDGE_AGENT_MAC, sizeof(EDGE_AGENT_MAC)) == 0;
+}
 
 static void relay_apply(bool enabled)
 {
@@ -73,11 +79,20 @@ static void espnow_recv_cb(const esp_now_recv_info_t *recv_info, const uint8_t *
         return;
     }
 
+    if (!is_authorized_peer(recv_info->src_addr)) {
+        ESP_LOGW(TAG, "ignoring rx from unauthorized peer " MACSTR,
+                 MAC2STR(recv_info->src_addr));
+        return;
+    }
+
     ESP_LOGI(TAG, "rx from " MACSTR " len=%d text=%.*s",
              MAC2STR(recv_info->src_addr), len, len, (const char *)data);
 
     if (len == 4 && memcmp(data, "hola", 4) == 0) {
-        const char *reply = "ack desde D4:E9:F4:64:B5:C4";
+        uint8_t self_mac[6] = {0};
+        ESP_ERROR_CHECK(esp_wifi_get_mac(WIFI_IF_STA, self_mac));
+        char reply[32] = {0};
+        snprintf(reply, sizeof(reply), "ack desde " MACSTR, MAC2STR(self_mac));
         esp_err_t err = esp_now_send(recv_info->src_addr, (const uint8_t *)reply, strlen(reply));
         if (err != ESP_OK) {
             ESP_LOGW(TAG, "reply failed: %s", esp_err_to_name(err));
@@ -125,8 +140,9 @@ void app_main(void)
     esp_err_t err = nvs_flash_init();
     if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
         ESP_ERROR_CHECK(nvs_flash_erase());
-        ESP_ERROR_CHECK(nvs_flash_init());
+        err = nvs_flash_init();
     }
+    ESP_ERROR_CHECK(err);
 
     relay_init();
     wifi_init();
