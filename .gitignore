@@ -1,0 +1,14 @@
+# ESP-IDF build output
+build/
+
+# Generated backup configs
+sdkconfig.old
+
+# Editor and local workspace settings
+.vscode/
+.idea/
+
+# OS and misc local files
+Thumbs.db
+Desktop.ini
+*.log
