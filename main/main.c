@@ -28,6 +28,18 @@ static bool is_authorized_peer(const uint8_t *mac)
     return mac && memcmp(mac, EDGE_AGENT_MAC, sizeof(EDGE_AGENT_MAC)) == 0;
 }
 
+static void espnow_send_text_reply(const uint8_t *dst_addr, const char *text)
+{
+    if (!dst_addr || !text) {
+        return;
+    }
+
+    esp_err_t err = esp_now_send(dst_addr, (const uint8_t *)text, strlen(text));
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "reply failed: %s", esp_err_to_name(err));
+    }
+}
+
 static void relay_apply(bool enabled)
 {
     relay_state = enabled;
@@ -93,29 +105,32 @@ static void espnow_recv_cb(const esp_now_recv_info_t *recv_info, const uint8_t *
         ESP_ERROR_CHECK(esp_wifi_get_mac(WIFI_IF_STA, self_mac));
         char reply[32] = {0};
         snprintf(reply, sizeof(reply), "ack desde " MACSTR, MAC2STR(self_mac));
-        esp_err_t err = esp_now_send(recv_info->src_addr, (const uint8_t *)reply, strlen(reply));
-        if (err != ESP_OK) {
-            ESP_LOGW(TAG, "reply failed: %s", esp_err_to_name(err));
-        }
+        espnow_send_text_reply(recv_info->src_addr, reply);
         return;
     }
 
     if ((len == 7 && memcmp(data, "rele on", 7) == 0) ||
         (len == 8 && memcmp(data, "relay on", 8) == 0)) {
         relay_apply(true);
+        espnow_send_text_reply(recv_info->src_addr, "ok relay=on");
         return;
     }
 
     if ((len == 8 && memcmp(data, "rele off", 8) == 0) ||
         (len == 9 && memcmp(data, "relay off", 9) == 0)) {
         relay_apply(false);
+        espnow_send_text_reply(recv_info->src_addr, "ok relay=off");
         return;
     }
 
     if ((len == 11 && memcmp(data, "rele toggle", 11) == 0) ||
         (len == 12 && memcmp(data, "relay toggle", 12) == 0)) {
         relay_apply(!relay_state);
+        espnow_send_text_reply(recv_info->src_addr, relay_state ? "ok relay=on" : "ok relay=off");
+        return;
     }
+
+    espnow_send_text_reply(recv_info->src_addr, "err invalid_cmd");
 }
 
 static void espnow_init_peer(void)
