@@ -130,6 +130,12 @@ static void espnow_recv_cb(const esp_now_recv_info_t *recv_info, const uint8_t *
         return;
     }
 
+    if ((len == 11 && memcmp(data, "rele status", 11) == 0) ||
+        (len == 12 && memcmp(data, "relay status", 12) == 0)) {
+        espnow_send_text_reply(recv_info->src_addr, relay_state ? "ok relay=on" : "ok relay=off");
+        return;
+    }
+
     espnow_send_text_reply(recv_info->src_addr, "err invalid_cmd");
 }
 
