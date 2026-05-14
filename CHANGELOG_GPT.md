@@ -10,7 +10,7 @@ Proyecto ESP-IDF minimo para un nodo `esp32_esclavo` que usa `ESP-NOW` en modo `
 
 ## Configuracion Actual
 
-- MAC del peer principal: `80:B5:4E:DE:45:AC`
+- MAC del peer principal: `DC:B4:D9:17:91:04`
 - Canal `ESP-NOW`: `11`
 - Tag de logs: `espnow_peer`
 
